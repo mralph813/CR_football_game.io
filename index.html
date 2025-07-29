@@ -20,15 +20,15 @@
     }
     canvas {
       border: 2px solid #000;
-      max-width: 95vw; /* Nearly full width */
-      max-height: 95vh; /* Nearly full height */
+      max-width: 95vw;
+      max-height: 95vh;
       touch-action: none;
       z-index: 5;
     }
     #instructions, #level, #score, #time {
       margin: 2px;
       text-align: center;
-      font-size: calc(0.03 * min(95vw, 95vh)); /* Dynamic font size */
+      font-size: calc(0.03 * min(95vw, 95vh));
     }
     #color-buttons {
       display: none;
@@ -98,10 +98,10 @@
       <h3>How to Play:</h3>
       <ul>
         <li><strong>Level 1 (Passing):</strong> Tap the teammate (white circle, yellow outline) in the best position to pass to, avoiding opponents (red circles). Time: 3s. Score 10 points to advance.</li>
-        <li><strong>Level 2 (Ball Tracking):</strong> Watch a fast, randomly moving ball for 10 seconds to train visual tracking. No tapping required. Advances automatically.</li>
+        <li><strong>Level 2 (Ball Tracking):</strong> Watch a ball follow a random pattern across the screen for 10 seconds to train visual tracking. No tapping required. Advances automatically.</li>
         <li><strong>Level 3 (Stroop Test):</strong> A word (e.g., "Blue" in white) appears. Tap the button matching the text color, not the word. Complete 10 correct answers to advance.</li>
         <li><strong>Level 4 (Advanced Passing):</strong> Like Level 1, but with more opponents, 2s timer, and an amber teammate (avoid). Score 10 points to advance.</li>
-        <li><strong>Level 5 (Elite Passing):</strong> Toughest level with 3-5 opponents, 1.5s timer, smaller targets, and amber distractors. Score 10 points to loop to Level 1.</li>
+        <li><strong>Level 5 (Elite Passing):</strong> Toughest level with 3-5 opponents, 1.5s timer, smaller targets, and white circles with orange/red outlines (avoid). Tap only the white circle with yellow outline. Score 10 points to loop to Level 1.</li>
       </ul>
       <p><strong>Scoring:</strong> Earn 1 point per correct action in Levels 1, 3, 4, 5. Incorrect actions or timeouts reset the scenario. Use quiet eye: focus on highlighted targets.</p>
       <button id="play-button" ontouchstart="startGame()">Play</button>
@@ -120,11 +120,13 @@
     let players = [];
     let correctPlayer = null;
     let startTime;
-    let ball = { x: 0, y: 0 };
+    let ball = { x: 0, y: 0, targetX: 0, targetY: 0, waypointIndex: 0, waypoints: [] };
     let stroopWords = [
       { word: 'Red', color: 'blue' }, { word: 'Blue', color: 'white' },
       { word: 'Green', color: 'red' }, { word: 'White', color: 'green' },
-      { word: 'Yellow', color: 'red' }
+      { word: 'Yellow', color: 'red' }, { word: 'Black', color: 'yellow' },
+      { word: 'Purple', color: 'green' }, { word: 'Orange', color: 'blue' },
+      { word: 'Pink', color: 'white' }, { word: 'Brown', color: 'red' }
     ];
     let stroopIndex = 0;
     let correctColor = '';
@@ -145,7 +147,7 @@
     }
 
     function updateCanvasSize() {
-      window.canvasWidth = min(windowWidth * 0.95, windowHeight * 0.95); // Nearly full screen
+      window.canvasWidth = min(windowWidth * 0.95, windowHeight * 0.95);
       window.canvasHeight = canvasWidth * 2 / 3;
     }
 
@@ -207,9 +209,9 @@
       for (let player of players) {
         fill(player.isOpponent ? 'red' : player.isAmber ? 'orange' : 'white');
         ellipse(player.x, player.y, circleSize, circleSize);
-        if (player === correctPlayer) {
+        if (player.outlineColor) {
           noFill();
-          stroke(255, 255, 0);
+          stroke(player.outlineColor);
           strokeWeight(4);
           ellipse(player.x, player.y, circleSize + 6, circleSize + 6);
           noStroke();
@@ -234,12 +236,24 @@
 
     function drawBallTracking() {
       if (gameState === 'playing') {
-        ball.vx = random(-9, 9);
-        ball.vy = random(-9, 9);
-        ball.x += ball.vx;
-        ball.y += ball.vy;
-        if (ball.x < 25 || ball.x > width - 25) ball.vx *= -1;
-        if (ball.y < 25 || ball.y > height - 25) ball.vy *= -1;
+        let target = ball.waypoints[ball.waypointIndex];
+        let speed = 3; // Slower speed
+        let dx = target.x - ball.x;
+        let dy = target.y - ball.y;
+        let distToTarget = dist(ball.x, ball.y, target.x, target.y);
+        if (distToTarget < speed) {
+          ball.waypointIndex = (ball.waypointIndex + 1) % ball.waypoints.length;
+          target = ball.waypoints[ball.waypointIndex];
+          dx = target.x - ball.x;
+          dy = target.y - ball.y;
+          distToTarget = dist(ball.x, ball.y, target.x, target.y);
+        }
+        let vx = (dx / distToTarget) * speed;
+        let vy = (dy / distToTarget) * speed;
+        ball.x += vx;
+        ball.y += vy;
+        if (ball.x < 5 || ball.x > width - 5) ball.x = constrain(ball.x, 5, width - 5);
+        if (ball.y < 5 || ball.y > height - 5) ball.y = constrain(ball.y, 5, height - 5);
         timeLeft = 10 - (millis() - startTime) / 1000;
         select('#time').html(`Time Left: ${max(0, timeLeft.toFixed(1))}s`);
         if (timeLeft <= 0) {
@@ -260,10 +274,10 @@
       text(current.word.toUpperCase(), width / 2, height / 2);
       if (gameState === 'correct') {
         fill(255);
-        text('Correct! Tap to continue.', width / 2, height / 2 + 40);
+        text(`Correct! ${10 - levelProgress} left. Tap to continue.`, width / 2, height / 2 + 40);
       } else if (gameState === 'wrong') {
         fill(255);
-        text('Wrong! Tap to try again.', width / 2, height / 2 + 40);
+        text(`Wrong! ${10 - levelProgress} left. Tap to try again.`, width / 2, height / 2 + 40);
       }
     }
 
@@ -316,29 +330,46 @@
       players = [];
       let numPlayers = level === 1 ? random(3, 6) : level === 4 ? random(4, 7) : random(5, 8);
       let numOpponents = level === 1 ? random(1, 3) : level === 4 ? random(2, 4) : random(3, 5);
+      let numDistractors = level === 5 ? random(1, 3) : level === 4 ? 1 : 0;
       let spacing = level === 5 ? 40 : 60;
       for (let i = 0; i < numPlayers; i++) {
         let isOpponent = i < numOpponents;
-        let isAmber = (level >= 4 && i === numOpponents && random() > 0.5);
+        let isAmber = level >= 4 && i === numOpponents;
+        let outlineColor = null;
+        if (level === 5 && i >= numOpponents && i < numOpponents + numDistractors) {
+          outlineColor = i % 2 === 0 ? [255, 165, 0] : [255, 0, 0]; // Orange or red
+        }
         let x, y;
         do {
           x = random(50, width - 50);
           y = random(50, height - 100);
         } while (players.some(p => dist(x, y, p.x, p.y) < spacing));
-        players.push({ x, y, isOpponent, isAmber });
+        players.push({ x, y, isOpponent, isAmber, outlineColor });
       }
-      let teammates = players.filter(p => !p.isOpponent && !p.isAmber);
+      let teammates = players.filter(p => !p.isOpponent && !p.isAmber && !p.outlineColor);
       correctPlayer = teammates.reduce((best, curr) => {
         let minDistToOpponent = min(players.filter(p => p.isOpponent).map(p => dist(curr.x, curr.y, p.x, p.y)));
         let bestDist = best ? min(players.filter(p => p.isOpponent).map(p => dist(best.x, best.y, p.x, p.y))) : 0;
         return minDistToOpponent > bestDist ? curr : best;
       }, null);
+      if (correctPlayer && level === 5) {
+        correctPlayer.outlineColor = [255, 255, 0]; // Yellow for correct player
+      }
       select('#color-buttons').hide();
     }
 
     function resetBallTracking() {
       ball.x = width / 2;
       ball.y = height / 2;
+      ball.waypointIndex = 0;
+      ball.waypoints = [];
+      for (let i = 0; i < 5; i++) {
+        ball.waypoints.push({
+          x: random(5, width - 5),
+          y: random(5, height - 5)
+        });
+      }
+      shuffle(ball.waypoints);
       select('#color-buttons').hide();
       gameState = 'playing';
       startTime = millis();
@@ -363,11 +394,11 @@
               score++;
               levelProgress++;
               gameState = 'correct';
-              select('#instructions').html('Correct! Tap to continue.');
+              select('#instructions').html(`Correct! ${10 - levelProgress} left. Tap to continue.`);
               checkLevelProgress();
             } else {
               gameState = 'wrong';
-              select('#instructions').html('Wrong! Tap to try again.');
+              select('#instructions').html(`Wrong! ${10 - levelProgress} left. Tap to try again.`);
             }
           }
         });
@@ -377,11 +408,11 @@
               score++;
               levelProgress++;
               gameState = 'correct';
-              select('#instructions').html('Correct! Tap to continue.');
+              select('#instructions').html(`Correct! ${10 - levelProgress} left. Tap to continue.`);
               checkLevelProgress();
             } else {
               gameState = 'wrong';
-              select('#instructions').html('Wrong! Tap to try again.');
+              select('#instructions').html(`Wrong! ${10 - levelProgress} left. Tap to try again.`);
             }
           }
         });
@@ -408,13 +439,13 @@
       if (level === 1) {
         select('#instructions').html('Tap the teammate (white) in the best position to pass to.');
       } else if (level === 2) {
-        select('#instructions').html('Watch the fast-moving ball to train visual tracking.');
+        select('#instructions').html('Watch the ball follow a random pattern to train visual tracking.');
       } else if (level === 3) {
-        select('#instructions').html('Tap the button matching the color of the word, not the word itself.');
+        select('#instructions').html(`Tap the button matching the color of the word, not the word itself. ${10 - levelProgress} left.`);
       } else if (level === 4) {
         select('#instructions').html('Tap the best teammate (white, avoid amber) to pass to.');
       } else if (level === 5) {
-        select('#instructions').html('Elite mode: Tap the best teammate (white, avoid amber) quickly!');
+        select('#instructions').html('Elite mode: Tap the teammate (white, yellow outline) quickly, avoid orange/red outlines!');
       }
     }
 
