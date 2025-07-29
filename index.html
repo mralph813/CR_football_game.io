@@ -15,29 +15,29 @@
       margin: 0;
       height: 100vh;
       overflow: hidden;
-      -webkit-user-select: none; /* Prevent text selection */
-      -webkit-touch-callout: none; /* Prevent iOS long-press */
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
     }
     canvas {
       border: 2px solid #000;
-      max-width: 100%;
-      max-height: 80vh;
-      touch-action: none; /* Prevent iOS touch interference */
-      z-index: 5; /* Ensure canvas is on top */
+      max-width: 90vw;
+      max-height: 60vh; /* Adjusted for dynamic sizing */
+      touch-action: none;
+      z-index: 5;
     }
     #instructions, #level, #score, #time {
-      margin: 10px;
+      margin: 5px;
       text-align: center;
-      font-size: 18px;
+      font-size: 3vw; /* Dynamic font size */
     }
     #color-buttons {
       display: none;
-      z-index: 10; /* Above canvas */
+      z-index: 10;
     }
     .color-button {
-      padding: 10px 20px;
-      margin: 5px;
-      font-size: 16px;
+      padding: 2vw 4vw;
+      margin: 1vw;
+      font-size: 2.5vw;
       cursor: pointer;
       touch-action: manipulation;
     }
@@ -51,24 +51,24 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      z-index: 20; /* Above all */
+      z-index: 20;
     }
     #start-popup {
       background: white;
-      padding: 20px;
+      padding: 4vw;
       border-radius: 10px;
       max-width: 90%;
       max-height: 80vh;
       overflow-y: auto;
       text-align: left;
-      font-size: 16px;
+      font-size: 2.5vw;
       line-height: 1.5;
     }
     #play-button {
       display: block;
-      margin: 20px auto 0;
-      padding: 10px 20px;
-      font-size: 18px;
+      margin: 4vw auto 0;
+      padding: 2vw 4vw;
+      font-size: 3vw;
       background-color: #28a745;
       color: white;
       border: none;
@@ -78,14 +78,14 @@
     }
     @media (max-width: 768px) {
       #instructions, #score, #time, #level {
-        font-size: 16px;
+        font-size: 2.5vw;
       }
       #start-popup {
-        font-size: 14px;
+        font-size: 2vw;
       }
       .color-button, #play-button {
-        padding: 8px 16px;
-        font-size: 14px;
+        padding: 1.5vw 3vw;
+        font-size: 2vw;
       }
     }
   </style>
@@ -98,13 +98,13 @@
       <h3>How to Play:</h3>
       <ul>
         <li><strong>Level 1 (Passing):</strong> Tap the teammate (white circle, yellow outline) in the best position to pass to, avoiding opponents (red circles). Time: 3s. Score 10 points to advance.</li>
-        <li><strong>Level 2 (Ball Tracking):</strong> Watch a fast-moving ball for 10 seconds to train visual tracking. No tapping required. Advances automatically.</li>
+        <li><strong>Level 2 (Ball Tracking):</strong> Watch a fast, randomly moving ball for 10 seconds to train visual tracking. No tapping required. Advances automatically.</li>
         <li><strong>Level 3 (Stroop Test):</strong> A word (e.g., "Blue" in white) appears. Tap the button matching the text color, not the word. Complete 10 correct answers to advance.</li>
         <li><strong>Level 4 (Advanced Passing):</strong> Like Level 1, but with more opponents, 2s timer, and an amber teammate (avoid). Score 10 points to advance.</li>
         <li><strong>Level 5 (Elite Passing):</strong> Toughest level with 3-5 opponents, 1.5s timer, smaller targets, and amber distractors. Score 10 points to loop to Level 1.</li>
       </ul>
       <p><strong>Scoring:</strong> Earn 1 point per correct action in Levels 1, 3, 4, 5. Incorrect actions or timeouts reset the scenario. Use quiet eye: focus on highlighted targets.</p>
-      <button id="play-button">Play</button>
+      <button id="play-button" ontouchstart="startGame()">Play</button>
     </div>
   </div>
   <div id="instructions">Tap the teammate in the best position to pass to.</div>
@@ -120,7 +120,7 @@
     let players = [];
     let correctPlayer = null;
     let startTime;
-    let ball = { x: 0, y: 0, vx: 0, vy: 0 };
+    let ball = { x: 0, y: 0 };
     let stroopWords = [
       { word: 'Red', color: 'blue' }, { word: 'Blue', color: 'white' },
       { word: 'Green', color: 'red' }, { word: 'White', color: 'green' },
@@ -132,26 +132,35 @@
     let canvas;
 
     function setup() {
-      let canvasWidth = min(windowWidth * 0.9, 768);
-      let canvasHeight = canvasWidth * 2 / 3;
+      updateCanvasSize();
       canvas = createCanvas(canvasWidth, canvasHeight);
       canvas.style('touch-action', 'none');
       textAlign(CENTER);
-      textSize(canvasWidth / 20);
-      select('#play-button').mousePressed(startGame);
-      // Bind native touchstart event
+      updateTextSize();
       canvas.elt.addEventListener('touchstart', handleTouch, { passive: false });
+      canvas.elt.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+      canvas.elt.addEventListener('touchend', (e) => e.preventDefault(), { passive: false });
+      select('#play-button').elt.addEventListener('touchstart', startGame, { passive: false });
       resetLevel();
     }
 
-    function windowResized() {
-      let canvasWidth = min(windowWidth * 0.9, 768);
-      let canvasHeight = canvasWidth * 2 / 3;
-      resizeCanvas(canvasWidth, canvasHeight);
+    function updateCanvasSize() {
+      window.canvasWidth = min(windowWidth * 0.9, windowHeight * 0.6);
+      window.canvasHeight = canvasWidth * 2 / 3;
+    }
+
+    function updateTextSize() {
       textSize(canvasWidth / 20);
     }
 
-    function startGame() {
+    function windowResized() {
+      updateCanvasSize();
+      resizeCanvas(canvasWidth, canvasHeight);
+      updateTextSize();
+    }
+
+    function startGame(event) {
+      if (event) event.preventDefault();
       select('#start-screen').hide();
       gameState = 'playing';
       startTime = millis();
@@ -161,34 +170,14 @@
       event.preventDefault();
       if (gameState === 'start') return;
       let rect = canvas.elt.getBoundingClientRect();
-      let touchX = event.touches[0].clientX - rect.left;
-      let touchY = event.touches[0].clientY - rect.top;
+      let touchX = (event.touches[0].clientX - rect.left) * (canvasWidth / rect.width);
+      let touchY = (event.touches[0].clientY - rect.top) * (canvasHeight / rect.height);
       if (level === 1 || level === 4 || level === 5) {
         handlePassingGameTouch(touchX, touchY);
       } else if (level === 3) {
-        handleStroopTestTouch();
+        handleStroopTestTouch(touchX, touchY);
       }
-      console.log('Touch detected at:', touchX, touchY); // Debug
-    }
-
-    function touchStarted() {
-      if (gameState === 'start') return false;
-      if (level === 1 || level === 4 || level === 5) {
-        handlePassingGameTouch(mouseX, mouseY);
-      } else if (level === 3) {
-        handleStroopTestTouch();
-      }
-      return false;
-    }
-
-    function mousePressed() {
-      if (gameState === 'start') return false;
-      if (level === 1 || level === 4 || level === 5) {
-        handlePassingGameTouch(mouseX, mouseY);
-      } else if (level === 3) {
-        handleStroopTestTouch();
-      }
-      return false;
+      console.log('Touch at:', touchX, touchY, 'Canvas:', canvasWidth, canvasHeight);
     }
 
     function draw() {
@@ -212,7 +201,7 @@
 
     function drawPassingGame() {
       let timeLimit = level === 1 ? 3 : level === 4 ? 2 : 1.5;
-      let circleSize = level === 5 ? 20 : 30;
+      let circleSize = level === 5 ? 25 : 35; // Increased for touch
       fill(255);
       ellipse(width / 2, height - 50, circleSize, circleSize);
       for (let player of players) {
@@ -245,6 +234,8 @@
 
     function drawBallTracking() {
       if (gameState === 'playing') {
+        ball.vx = random(-9, 9); // Random velocity per frame
+        ball.vy = random(-9, 9);
         ball.x += ball.vx;
         ball.y += ball.vy;
         if (ball.x < 25 || ball.x > width - 25) ball.vx *= -1;
@@ -259,7 +250,7 @@
         }
       }
       fill(255);
-      ellipse(ball.x, ball.y, 30, 30);
+      ellipse(ball.x, ball.y, 35, 35);
     }
 
     function drawStroopTest() {
@@ -277,7 +268,7 @@
     }
 
     function handlePassingGameTouch(touchX, touchY) {
-      let circleSize = level === 5 ? 20 : 30;
+      let circleSize = level === 5 ? 25 : 35;
       if (gameState === 'playing') {
         for (let player of players) {
           if (dist(touchX, touchY, player.x, player.y) < circleSize / 2) {
@@ -301,8 +292,13 @@
       }
     }
 
-    function handleStroopTestTouch() {
-      // Handled via buttons
+    function handleStroopTestTouch(touchX, touchY) {
+      if (gameState === 'correct' || gameState === 'wrong') {
+        resetLevel();
+        gameState = 'playing';
+        startTime = millis();
+        updateInstructions();
+      }
     }
 
     function resetLevel() {
@@ -343,8 +339,6 @@
     function resetBallTracking() {
       ball.x = width / 2;
       ball.y = height / 2;
-      ball.vx = random(-9, 9); // 3x faster
-      ball.vy = random(-9, 9); // 3x faster
       select('#color-buttons').hide();
       gameState = 'playing';
       startTime = millis();
@@ -362,6 +356,21 @@
         button.style('background-color', color);
         button.style('color', color === 'white' ? 'black' : 'white');
         button.class('color-button');
+        button.elt.addEventListener('touchstart', (e) => {
+          e.preventDefault();
+          if (gameState === 'playing' && level === 3) {
+            if (color === correctColor) {
+              score++;
+              levelProgress++;
+              gameState = 'correct';
+              select('#instructions').html('Correct! Tap to continue.');
+              checkLevelProgress();
+            } else {
+              gameState = 'wrong';
+              select('#instructions').html('Wrong! Tap to try again.');
+            }
+          }
+        });
         button.mousePressed(() => {
           if (gameState === 'playing' && level === 3) {
             if (color === correctColor) {
