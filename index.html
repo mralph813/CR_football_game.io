@@ -98,7 +98,7 @@
       <h3>How to Play:</h3>
       <ul>
         <li><strong>Level 1 (Passing):</strong> Tap the teammate (white circle, yellow outline) in the best position to pass to, avoiding opponents (red circles). Time: 3s. Score 10 points to advance.</li>
-        <li><strong>Level 2 (Ball Tracking):</strong> Watch a ball follow a random pattern across the screen for 10 seconds to train visual tracking. No tapping required. Advances automatically.</li>
+        <li><strong>Level 2 (Ball Tracking):</strong> Track a white ball moving slowly across the screen for 10 seconds to train visual tracking. No tapping required. Advances automatically.</li>
         <li><strong>Level 3 (Stroop Test):</strong> A word (e.g., "Blue" in white) appears. Tap the button matching the text color, not the word. Complete 10 correct answers to advance.</li>
         <li><strong>Level 4 (Advanced Passing):</strong> Like Level 1, but with more opponents, 2s timer, and an amber teammate (avoid). Score 10 points to advance.</li>
         <li><strong>Level 5 (Elite Passing):</strong> Toughest level with 3-5 opponents, 1.5s timer, smaller targets, and white circles with orange/red outlines (avoid). Tap only the white circle with yellow outline. Score 10 points to loop to Level 1.</li>
@@ -120,17 +120,18 @@
     let players = [];
     let correctPlayer = null;
     let startTime;
-    let ball = { x: 0, y: 0, targetX: 0, targetY: 0, waypointIndex: 0, waypoints: [] };
+    let ball = { x: 0, y: 0, vx: 0, vy: 0 };
     let stroopWords = [
-      { word: 'Red', color: 'blue' }, { word: 'Blue', color: 'white' },
-      { word: 'Green', color: 'red' }, { word: 'White', color: 'green' },
-      { word: 'Yellow', color: 'red' }, { word: 'Black', color: 'yellow' },
-      { word: 'Purple', color: 'green' }, { word: 'Orange', color: 'blue' },
-      { word: 'Pink', color: 'white' }, { word: 'Brown', color: 'red' }
+      { word: 'Red', color: 'blue' }, { word: 'Red', color: 'white' },
+      { word: 'Blue', color: 'green' }, { word: 'Blue', color: 'yellow' },
+      { word: 'Green', color: 'red' }, { word: 'Green', color: 'white' },
+      { word: 'White', color: 'blue' }, { word: 'White', color: 'green' },
+      { word: 'Yellow', color: 'red' }, { word: 'Yellow', color: 'blue' }
     ];
     let stroopIndex = 0;
     let correctColor = '';
     let levelProgress = 0;
+    let usedWords = [];
     let canvas;
 
     function setup() {
@@ -236,39 +237,31 @@
 
     function drawBallTracking() {
       if (gameState === 'playing') {
-        let target = ball.waypoints[ball.waypointIndex];
-        let speed = 3; // Slower speed
-        let dx = target.x - ball.x;
-        let dy = target.y - ball.y;
-        let distToTarget = dist(ball.x, ball.y, target.x, target.y);
-        if (distToTarget < speed) {
-          ball.waypointIndex = (ball.waypointIndex + 1) % ball.waypoints.length;
-          target = ball.waypoints[ball.waypointIndex];
-          dx = target.x - ball.x;
-          dy = target.y - ball.y;
-          distToTarget = dist(ball.x, ball.y, target.x, target.y);
-        }
-        let vx = (dx / distToTarget) * speed;
-        let vy = (dy / distToTarget) * speed;
-        ball.x += vx;
-        ball.y += vy;
-        if (ball.x < 5 || ball.x > width - 5) ball.x = constrain(ball.x, 5, width - 5);
-        if (ball.y < 5 || ball.y > height - 5) ball.y = constrain(ball.y, 5, height - 5);
+        ball.vx = random(-3, 3);
+        ball.vy = random(-3, 3);
+        ball.x += ball.vx;
+        ball.y += ball.vy;
+        if (ball.x < 5 || ball.x > width - 5) ball.vx *= -1;
+        if (ball.y < 5 || ball.y > height - 5) ball.vy *= -1;
+        fill(255);
+        ellipse(ball.x, ball.y, 40, 40); // Slightly larger white ball
         timeLeft = 10 - (millis() - startTime) / 1000;
         select('#time').html(`Time Left: ${max(0, timeLeft.toFixed(1))}s`);
         if (timeLeft <= 0) {
           level = 3;
           levelProgress = 0;
+          usedWords = [];
           resetLevel();
           updateInstructions();
         }
       }
-      fill(255);
-      ellipse(ball.x, ball.y, 35, 35);
     }
 
     function drawStroopTest() {
       select('#time').html('');
+      if (stroopIndex >= stroopWords.length || !stroopWords[stroopIndex] || gameState === 'start') {
+        resetStroopTest(); // Prevent blank screen
+      }
       let current = stroopWords[stroopIndex];
       fill(current.color);
       text(current.word.toUpperCase(), width / 2, height / 2);
@@ -308,7 +301,7 @@
 
     function handleStroopTestTouch(touchX, touchY) {
       if (gameState === 'correct' || gameState === 'wrong') {
-        resetLevel();
+        resetStroopTest();
         gameState = 'playing';
         startTime = millis();
         updateInstructions();
@@ -361,23 +354,23 @@
     function resetBallTracking() {
       ball.x = width / 2;
       ball.y = height / 2;
-      ball.waypointIndex = 0;
-      ball.waypoints = [];
-      for (let i = 0; i < 5; i++) {
-        ball.waypoints.push({
-          x: random(5, width - 5),
-          y: random(5, height - 5)
-        });
-      }
-      shuffle(ball.waypoints);
+      ball.vx = random(-3, 3);
+      ball.vy = random(-3, 3);
       select('#color-buttons').hide();
       gameState = 'playing';
       startTime = millis();
     }
 
     function resetStroopTest() {
-      stroopIndex = floor(random(stroopWords.length));
-      correctColor = stroopWords[stroopIndex].color;
+      let availableWords = stroopWords.filter(word => !usedWords.includes(word));
+      if (availableWords.length === 0) {
+        usedWords = [];
+        availableWords = stroopWords;
+      }
+      stroopIndex = floor(random(availableWords.length));
+      let selectedWord = availableWords[stroopIndex];
+      usedWords.push(selectedWord);
+      correctColor = selectedWord.color;
       let buttons = ['red', 'blue', 'white', 'green', 'yellow'];
       shuffle(buttons);
       let buttonDiv = select('#color-buttons');
@@ -425,11 +418,13 @@
       if ((level === 1 || level === 4 || level === 5) && levelProgress >= 10) {
         level = level === 5 ? 1 : level + 1;
         levelProgress = 0;
+        usedWords = [];
         resetLevel();
         updateInstructions();
       } else if (level === 3 && levelProgress >= 10) {
         level = 4;
         levelProgress = 0;
+        usedWords = [];
         resetLevel();
         updateInstructions();
       }
@@ -439,7 +434,7 @@
       if (level === 1) {
         select('#instructions').html('Tap the teammate (white) in the best position to pass to.');
       } else if (level === 2) {
-        select('#instructions').html('Watch the ball follow a random pattern to train visual tracking.');
+        select('#instructions').html('Track the white ball moving slowly across the screen.');
       } else if (level === 3) {
         select('#instructions').html(`Tap the button matching the color of the word, not the word itself. ${10 - levelProgress} left.`);
       } else if (level === 4) {
