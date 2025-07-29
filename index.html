@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Football Decision Training Game (iPad)</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.2/p5.min.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: Arial, sans-serif;
+      background-color: #f0f0f0;
+      margin: 0;
+      height: 100vh;
+      overflow: hidden;
+    }
+    canvas {
+      border: 2px solid #000;
+      max-width: 100%;
+      max-height: 80vh;
+    }
+    #instructions {
+      margin: 10px;
+      text-align: center;
+      font-size: 18px;
+      padding: 10px;
+    }
+    #score, #time, #level {
+      font-size: 20px;
+      margin: 5px;
+    }
+    .color-button {
+      padding: 10px 20px;
+      margin: 5px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    @media (max-width: 768px) {
+      #instructions, #score, #time, #level {
+        font-size: 16px;
+      }
+      .color-button {
+        padding: 8px 16px;
+        font-size: 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="instructions">Tap the teammate in the best position to pass to.</div>
+  <div id="level">Level: 1</div>
+  <div id="score">Score: 0</div>
+  <div id="time">Time Left: 3.0s</div>
+  <div id="color-buttons" style="display: none;"></div>
+  <script>
+    let level = 1;
+    let score = 0;
+    let timeLeft = 3;
+    let gameState = 'playing';
+    let players = [];
+    let correctPlayer = null;
+    let startTime;
+    let ball = { x: 0, y: 0, vx: 0, vy: 0, lastTap: 0 };
+    let stroopWords = [
+      { word: 'Red', color: 'blue' }, { word: 'Blue', color: 'white' },
+      { word: 'Green', color: 'red' }, { word: 'White', color: 'green' },
+      { word: 'Yellow', color: 'red' }
+    ];
+    let stroopIndex = 0;
+    let correctColor = '';
+    let levelProgress = 0;
+
+    function setup() {
+      let canvasWidth = min(windowWidth * 0.9, 768);
+      let canvasHeight = canvasWidth * 2 / 3;
+      createCanvas(canvasWidth, canvasHeight);
+      textAlign(CENTER);
+      textSize(canvasWidth / 20);
+      resetLevel();
+      startTime = millis();
+    }
+
+    function windowResized() {
+      let canvasWidth = min(windowWidth * 0.9, 768);
+      let canvasHeight = canvasWidth * 2 / 3;
+      resizeCanvas(canvasWidth, canvasHeight);
+      textSize(canvasWidth / 20);
+    }
+
+    function draw() {
+      background(0, 128, 0); // Green field
+      if (level === 1 || level === 4 || level === 5) {
+        drawPassingGame();
+      } else if (level === 2) {
+        drawBallTracking();
+      } else if (level === 3) {
+        drawStroopTest();
+      }
+      select('#level').html(`Level: ${level}`);
+      select('#score').html(`Score: ${score}`);
+    }
+
+    function drawPassingGame() {
+      let timeLimit = level === 1 ? 3 : level === 4 ? 2 : 1.5;
+      let circleSize = level === 5 ? 20 : 30;
+      fill(255);
+      ellipse(width / 2, height - 50, circleSize, circleSize);
+      for (let player of players) {
+        fill(player.isOpponent ? 'red' : player.isAmber ? 'orange' : 'white');
+        ellipse(player.x, player.y, circleSize, circleSize);
+        if (player === correctPlayer) {
+          noFill();
+          stroke(255, 255, 0);
+          strokeWeight(4);
+          ellipse(player.x, player.y, circleSize + 6, circleSize + 6);
+          noStroke();
+        }
+      }
+      if (gameState === 'playing') {
+        timeLeft = timeLimit - (millis() - startTime) / 1000;
+        select('#time').html(`Time Left: ${max(0, timeLeft.toFixed(1))}s`);
+        if (timeLeft <= 0) {
+          gameState = 'timeout';
+          select('#instructions').html('Time’s up! Tap to try again.');
+        }
+      }
+      if (gameState === 'correct') {
+        fill(255);
+        text('Correct! Tap to continue.', width / 2, height / 2);
+      } else if (gameState === 'wrong') {
+        fill(255);
+        text('Wrong! Tap to try again.', width / 2, height / 2);
+      }
+    }
+
+    function drawBallTracking() {
+      if (gameState === 'playing') {
+        ball.x += ball.vx;
+        ball.y += ball.vy;
+        if (ball.x < 25 || ball.x > width - 25) ball.vx *= -1;
+        if (ball.y < 25 || ball.y > height - 25) ball.vy *= -1;
+        timeLeft = 5 - (millis() - startTime) / 1000;
+        select('#time').html(`Time Left: ${max(0, timeLeft.toFixed(1))}s`);
+        if (timeLeft <= 0) {
+          gameState = 'timeout';
+          select('#instructions').html('Time’s up! Tap to try again.');
+        }
+      }
+      fill(255);
+      ellipse(ball.x, ball.y, 30, 30);
+      if (gameState === 'correct') {
+        fill(255);
+        text('Correct! Tap to continue.', width / 2, height / 2);
+      } else if (gameState === 'wrong') {
+        fill(255);
+        text('Wrong! Tap to try again.', width / 2, height / 2);
+      }
+    }
+
+    function drawStroopTest() {
+      select('#time').html('');
+      let current = stroopWords[stroopIndex];
+      fill(current.color);
+      text(current.word.toUpperCase(), width / 2, height / 2);
+      if (gameState === 'correct') {
+        fill(255);
+        text('Correct! Tap to continue.', width / 2, height / 2 + 40);
+      } else if (gameState === 'wrong') {
+        fill(255);
+        text('Wrong! Tap to try again.', width / 2, height / 2 + 40);
+      }
+    }
+
+    function touchStarted() {
+      if (level === 1 || level === 4 || level === 5) {
+        handlePassingGameTouch();
+      } else if (level === 2) {
+        handleBallTrackingTouch();
+      } else if (level === 3) {
+        handleStroopTestTouch();
+      }
+      return false;
+    }
+
+    function handlePassingGameTouch() {
+      let circleSize = level === 5 ? 20 : 30;
+      if (gameState === 'playing') {
+        for (let player of players) {
+          if (dist(touchX, touchY, player.x, player.y) < circleSize / 2) {
+            if (player === correctPlayer) {
+              score++;
+              levelProgress++;
+              gameState = 'correct';
+              select('#instructions').html('Correct! Tap to continue.');
+              checkLevelProgress();
+            } else {
+              gameState = 'wrong';
+              select('#instructions').html('Wrong! Tap to try again.');
+            }
+          }
+        }
+      } else {
+        resetLevel();
+        gameState = 'playing';
+        startTime = millis();
+        updateInstructions();
+      }
+    }
+
+    function handleBallTrackingTouch() {
+      if (gameState === 'playing') {
+        if (dist(touchX, touchY, ball.x, ball.y) < 15 && timeLeft < 0.5) {
+          score++;
+          levelProgress++;
+          gameState = 'correct';
+          select('#instructions').html('Correct! Tap to continue.');
+          checkLevelProgress();
+        } else if (dist(touchX, touchY, ball.x, ball.y) < 15) {
+          gameState = 'wrong';
+          select('#instructions').html('Too early! Tap to try again.');
+        }
+      } else {
+        resetLevel();
+        gameState = 'playing';
+        startTime = millis();
+        updateInstructions();
+      }
+    }
+
+    function handleStroopTestTouch() {
+      // Handled via buttons in HTML
+    }
+
+    function resetLevel() {
+      if (level === 1 || level === 4 || level === 5) {
+        resetPassingGame();
+      } else if (level === 2) {
+        resetBallTracking();
+      } else if (level === 3) {
+        resetStroopTest();
+      }
+      timeLeft = level === 1 ? 3 : level === 4 ? 2 : level === 5 ? 1.5 : 5;
+    }
+
+    function resetPassingGame() {
+      players = [];
+      let numPlayers = level === 1 ? random(3, 6) : level === 4 ? random(4, 7) : random(5, 8);
+      let numOpponents = level === 1 ? random(1, 3) : level === 4 ? random(2, 4) : random(3, 5);
+      let spacing = level === 5 ? 40 : 60;
+      for (let i = 0; i < numPlayers; i++) {
+        let isOpponent = i < numOpponents;
+        let isAmber = (level >= 4 && i === numOpponents && random() > 0.5);
+        let x, y;
+        do {
+          x = random(50, width - 50);
+          y = random(50, height - 100);
+        } while (players.some(p => dist(x, y, p.x, p.y) < spacing));
+        players.push({ x, y, isOpponent, isAmber });
+      }
+      let teammates = players.filter(p => !p.isOpponent && !p.isAmber);
+      correctPlayer = teammates.reduce((best, curr) => {
+        let minDistToOpponent = min(players.filter(p => p.isOpponent).map(p => dist(curr.x, curr.y, p.x, p.y)));
+        let bestDist = best ? min(players.filter(p => p.isOpponent).map(p => dist(best.x, best.y, p.x, p.y))) : 0;
+        return minDistToOpponent > bestDist ? curr : best;
+      }, null);
+      select('#color-buttons').hide();
+    }
+
+    function resetBallTracking() {
+      ball.x = width / 2;
+      ball.y = height / 2;
+      ball.vx = random(-3, 3);
+      ball.vy = random(-3, 3);
+      ball.lastTap = 0;
+      select('#color-buttons').hide();
+    }
+
+    function resetStroopTest() {
+      stroopIndex = floor(random(stroopWords.length));
+      correctColor = stroopWords[stroopIndex].color;
+      let buttons = ['red', 'blue', 'white', 'green', 'yellow'];
+      shuffle(buttons);
+      let buttonDiv = select('#color-buttons');
+      buttonDiv.html('');
+      for (let color of buttons) {
+        let button = createButton(color.toUpperCase());
+        button.style('background-color', color);
+        button.style('color', color === 'white' ? 'black' : 'white');
+        button.class('color-button');
+        button.mousePressed(() => {
+          if (gameState === 'playing' && level === 3) {
+            if (color === correctColor) {
+              score++;
+              levelProgress++;
+              gameState = 'correct';
+              select('#instructions').html('Correct! Tap to continue.');
+              checkLevelProgress();
+            } else {
+              gameState = 'wrong';
+              select('#instructions').html('Wrong! Tap to try again.');
+            }
+          }
+        });
+        buttonDiv.child(button);
+      }
+      buttonDiv.show();
+    }
+
+    function checkLevelProgress() {
+      if ((level === 1 || level === 4 || level === 5) && levelProgress >= 10) {
+        level = level === 5 ? 1 : level + 1;
+        levelProgress = 0;
+        resetLevel();
+        updateInstructions();
+      } else if (level === 2 && levelProgress >= 5) {
+        level = 3;
+        levelProgress = 0;
+        resetLevel();
+        updateInstructions();
+      } else if (level === 3 && levelProgress >= 10) {
+        level = 4;
+        levelProgress = 0;
+        resetLevel();
+        updateInstructions();
+      }
+    }
+
+    function updateInstructions() {
+      if (level === 1) {
+        select('#instructions').html('Tap the teammate (white) in the best position to pass to.');
+      } else if (level === 2) {
+        select('#instructions').html('Track the ball and tap it when it stops (near 0s).');
+      } else if (level === 3) {
+        select('#instructions').html('Tap the button matching the color of the word, not the word itself.');
+      } else if (level === 4) {
+        select('#instructions').html('Tap the best teammate (white, avoid amber) to pass to.');
+      } else if (level === 5) {
+        select('#instructions').html('Elite mode: Tap the best teammate (white, avoid amber) quickly!');
+      }
+    }
+
+    function shuffle(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        let j = floor(random(i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+    }
+  </script>
+</body>
+</html>
