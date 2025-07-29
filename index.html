@@ -20,28 +20,66 @@
       border: 2px solid #000;
       max-width: 100%;
       max-height: 80vh;
+      touch-action: none; /* Prevent iOS touch interference */
     }
-    #instructions {
+    #instructions, #level, #score, #time {
       margin: 10px;
       text-align: center;
       font-size: 18px;
-      padding: 10px;
     }
-    #score, #time, #level {
-      font-size: 20px;
-      margin: 5px;
+    #color-buttons {
+      display: none;
     }
     .color-button {
       padding: 10px 20px;
       margin: 5px;
       font-size: 16px;
       cursor: pointer;
+      touch-action: manipulation; /* Ensure button touch events */
+    }
+    #start-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+    #start-popup {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      max-width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+      text-align: left;
+      font-size: 16px;
+      line-height: 1.5;
+    }
+    #play-button {
+      display: block;
+      margin: 20px auto 0;
+      padding: 10px 20px;
+      font-size: 18px;
+      background-color: #28a745;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      touch-action: manipulation;
     }
     @media (max-width: 768px) {
       #instructions, #score, #time, #level {
         font-size: 16px;
       }
-      .color-button {
+      #start-popup {
+        font-size: 14px;
+      }
+      .color-button, #play-button {
         padding: 8px 16px;
         font-size: 14px;
       }
@@ -49,16 +87,32 @@
   </style>
 </head>
 <body>
+  <div id="start-screen">
+    <div id="start-popup">
+      <h2>Football Decision Training Game</h2>
+      <p><strong>Premise:</strong> This game trains your mental processing speed and "quiet eye" (focused visual attention) to make fast, accurate football passing decisions, mimicking elite-level play.</p>
+      <h3>How to Play:</h3>
+      <ul>
+        <li><strong>Level 1 (Passing):</strong> Tap the teammate (white circle, yellow outline) in the best position to pass to, avoiding opponents (red circles). Time: 3s. Score 10 points to advance.</li>
+        <li><strong>Level 2 (Ball Tracking):</strong> Follow a moving ball and tap it when it stops (near 0s). Time: 5s. Complete 5 taps to advance.</li>
+        <li><strong>Level 3 (Stroop Test):</strong> A word (e.g., "Blue" in white) appears. Tap the button matching the text color, not the word. Complete 10 correct answers to advance.</li>
+        <li><strong>Level 4 (Advanced Passing):</strong> Like Level 1, but with more opponents, 2s timer, and an amber teammate (avoid). Score 10 points to advance.</li>
+        <li><strong>Level 5 (Elite Passing):</strong> Toughest level with 3-5 opponents, 1.5s timer, smaller targets, and amber distractors. Score 10 points to loop to Level 1.</li>
+      </ul>
+      <p><strong>Scoring:</strong> Earn 1 point per correct action. Incorrect actions or timeouts reset the scenario. Use quiet eye: focus on the highlighted target before acting.</p>
+      <button id="play-button">Play</button>
+    </div>
+  </div>
   <div id="instructions">Tap the teammate in the best position to pass to.</div>
   <div id="level">Level: 1</div>
   <div id="score">Score: 0</div>
   <div id="time">Time Left: 3.0s</div>
-  <div id="color-buttons" style="display: none;"></div>
+  <div id="color-buttons"></div>
   <script>
     let level = 1;
     let score = 0;
     let timeLeft = 3;
-    let gameState = 'playing';
+    let gameState = 'start';
     let players = [];
     let correctPlayer = null;
     let startTime;
@@ -75,11 +129,12 @@
     function setup() {
       let canvasWidth = min(windowWidth * 0.9, 768);
       let canvasHeight = canvasWidth * 2 / 3;
-      createCanvas(canvasWidth, canvasHeight);
+      let canvas = createCanvas(canvasWidth, canvasHeight);
+      canvas.style('touch-action', 'none'); // Extra touch event prevention
       textAlign(CENTER);
       textSize(canvasWidth / 20);
+      select('#play-button').mousePressed(startGame);
       resetLevel();
-      startTime = millis();
     }
 
     function windowResized() {
@@ -89,8 +144,20 @@
       textSize(canvasWidth / 20);
     }
 
+    function startGame() {
+      select('#start-screen').hide();
+      gameState = 'playing';
+      startTime = millis();
+    }
+
     function draw() {
-      background(0, 128, 0); // Green field
+      if (gameState === 'start') {
+        background(0, 128, 0);
+        fill(255);
+        text('Tap Play to start', width / 2, height / 2);
+        return;
+      }
+      background(0, 128, 0);
       if (level === 1 || level === 4 || level === 5) {
         drawPassingGame();
       } else if (level === 2) {
@@ -174,6 +241,20 @@
     }
 
     function touchStarted() {
+      if (gameState === 'start') return false;
+      if (level === 1 || level === 4 || level === 5) {
+        handlePassingGameTouch();
+      } else if (level === 2) {
+        handleBallTrackingTouch();
+      } else if (level === 3) {
+        handleStroopTestTouch();
+      }
+      return false;
+    }
+
+    function mousePressed() {
+      // Fallback for touch events
+      if (gameState === 'start') return false;
       if (level === 1 || level === 4 || level === 5) {
         handlePassingGameTouch();
       } else if (level === 2) {
@@ -188,7 +269,7 @@
       let circleSize = level === 5 ? 20 : 30;
       if (gameState === 'playing') {
         for (let player of players) {
-          if (dist(touchX, touchY, player.x, player.y) < circleSize / 2) {
+          if (dist(mouseX, mouseY, player.x, player.y) < circleSize / 2) {
             if (player === correctPlayer) {
               score++;
               levelProgress++;
@@ -211,13 +292,13 @@
 
     function handleBallTrackingTouch() {
       if (gameState === 'playing') {
-        if (dist(touchX, touchY, ball.x, ball.y) < 15 && timeLeft < 0.5) {
+        if (dist(mouseX, mouseY, ball.x, ball.y) < 15 && timeLeft < 0.5) {
           score++;
           levelProgress++;
           gameState = 'correct';
           select('#instructions').html('Correct! Tap to continue.');
           checkLevelProgress();
-        } else if (dist(touchX, touchY, ball.x, ball.y) < 15) {
+        } else if (dist(mouseX, mouseY, ball.x, ball.y) < 15) {
           gameState = 'wrong';
           select('#instructions').html('Too early! Tap to try again.');
         }
@@ -230,7 +311,7 @@
     }
 
     function handleStroopTestTouch() {
-      // Handled via buttons in HTML
+      // Handled via buttons
     }
 
     function resetLevel() {
