@@ -177,8 +177,6 @@
       let touchY = (event.touches[0].clientY - rect.top) * (canvasHeight / rect.height);
       if (level === 1 || level === 4 || level === 5) {
         handlePassingGameTouch(touchX, touchY);
-      } else if (level === 3) {
-        handleStroopTestTouch(touchX, touchY);
       }
       console.log('Touch at:', touchX, touchY, 'Canvas:', canvasWidth, canvasHeight);
     }
@@ -270,10 +268,10 @@
       text(current.word.toUpperCase(), width / 2, height / 2);
       if (gameState === 'correct') {
         fill(255);
-        text(`Correct! ${10 - levelProgress} left. Tap to continue.`, width / 2, height / 2 + 40);
+        text(`Correct! ${10 - levelProgress} left. Tap a button to continue.`, width / 2, height / 2 + 40);
       } else if (gameState === 'wrong') {
         fill(255);
-        text(`Wrong! ${10 - levelProgress} left. Tap to try again.`, width / 2, height / 2 + 40);
+        text(`Wrong! ${10 - levelProgress} left. Tap a button to try again.`, width / 2, height / 2 + 40);
       }
     }
 
@@ -296,15 +294,6 @@
         }
       } else {
         resetLevel();
-        gameState = 'playing';
-        startTime = millis();
-        updateInstructions();
-      }
-    }
-
-    function handleStroopTestTouch(touchX, touchY) {
-      if (gameState === 'correct' || gameState === 'wrong') {
-        resetStroopTest();
         gameState = 'playing';
         startTime = millis();
         updateInstructions();
@@ -437,30 +426,42 @@
         button.class('color-button');
         button.elt.addEventListener('touchstart', (e) => {
           e.preventDefault();
-          if (gameState === 'playing' && level === 3) {
-            if (color === correctColor) {
-              score++;
-              levelProgress++;
-              gameState = 'correct';
-              select('#instructions').html(`Correct! ${10 - levelProgress} left. Tap to continue.`);
-              checkLevelProgress();
+          if (level === 3) {
+            if (gameState === 'playing') {
+              if (color === correctColor) {
+                score++;
+                levelProgress++;
+                gameState = 'correct';
+                select('#instructions').html(`Correct! ${10 - levelProgress} left. Tap a button to continue.`);
+                checkLevelProgress();
+              } else {
+                gameState = 'wrong';
+                select('#instructions').html(`Wrong! ${10 - levelProgress} left. Tap a button to try again.`);
+              }
             } else {
-              gameState = 'wrong';
-              select('#instructions').html(`Wrong! ${10 - levelProgress} left. Tap to try again.`);
+              resetStroopTest();
+              gameState = 'playing';
+              updateInstructions();
             }
           }
         });
         button.mousePressed(() => {
-          if (gameState === 'playing' && level === 3) {
-            if (color === correctColor) {
-              score++;
-              levelProgress++;
-              gameState = 'correct';
-              select('#instructions').html(`Correct! ${10 - levelProgress} left. Tap to continue.`);
-              checkLevelProgress();
+          if (level === 3) {
+            if (gameState === 'playing') {
+              if (color === correctColor) {
+                score++;
+                levelProgress++;
+                gameState = 'correct';
+                select('#instructions').html(`Correct! ${10 - levelProgress} left. Tap a button to continue.`);
+                checkLevelProgress();
+              } else {
+                gameState = 'wrong';
+                select('#instructions').html(`Wrong! ${10 - levelProgress} left. Tap a button to try again.`);
+              }
             } else {
-              gameState = 'wrong';
-              select('#instructions').html(`Wrong! ${10 - levelProgress} left. Tap to try again.`);
+              resetStroopTest();
+              gameState = 'playing';
+              updateInstructions();
             }
           }
         });
