@@ -97,7 +97,7 @@
       <p><strong>Premise:</strong> This game trains your mental processing speed and "quiet eye" (focused visual attention) to make fast, accurate football passing decisions, mimicking elite-level play.</p>
       <h3>How to Play:</h3>
       <ul>
-        <li><strong>Level 1 (Passing):</strong> Tap the teammate (white circle, yellow outline) in the best position to pass to, avoiding opponents (red circles). Time: 3s. Score 10 points to advance.</li>
+        <li><strong>Level 1 (Passing):</strong> Tap the white teammate not near any red opponents. Three white teammates, two red opponents; two white teammates are near red ones. Time: 3s. Score 10 points to advance.</li>
         <li><strong>Level 2 (Ball Tracking):</strong> Track a white ball moving slowly across the screen for 10 seconds to train visual tracking. No tapping required. Advances automatically.</li>
         <li><strong>Level 3 (Stroop Test):</strong> A word (e.g., "Blue" in white) appears. Tap the button matching the text color, not the word. Complete 10 correct answers to advance.</li>
         <li><strong>Level 4 (Advanced Passing):</strong> Like Level 1, but with more opponents, 2s timer, and an amber teammate (avoid). Score 10 points to advance.</li>
@@ -107,7 +107,7 @@
       <button id="play-button" ontouchstart="startGame()">Play</button>
     </div>
   </div>
-  <div id="instructions">Tap the teammate in the best position to pass to.</div>
+  <div id="instructions">Tap the teammate not near any red opponents.</div>
   <div id="level">Level: 1</div>
   <div id="score">Score: 0</div>
   <div id="time">Time Left: 3.0s</div>
@@ -120,7 +120,7 @@
     let players = [];
     let correctPlayer = null;
     let startTime;
-    let ball = { x: 0, y: 0, vx: 0, vy: 0 };
+    let ball = { x: 0, y: 0, vx: 0, vy: 0, lastUpdate: 0 };
     let stroopWords = [
       { word: 'Red', color: 'blue' }, { word: 'Red', color: 'white' },
       { word: 'Blue', color: 'green' }, { word: 'Blue', color: 'yellow' },
@@ -237,8 +237,11 @@
 
     function drawBallTracking() {
       if (gameState === 'playing') {
-        ball.vx = random(-3, 3);
-        ball.vy = random(-3, 3);
+        if (millis() - ball.lastUpdate > 1000) { // Update velocity every second
+          ball.vx = random(-3, 3);
+          ball.vy = random(-3, 3);
+          ball.lastUpdate = millis();
+        }
         ball.x += ball.vx;
         ball.y += ball.vy;
         if (ball.x < 5 || ball.x > width - 5) ball.vx *= -1;
@@ -321,32 +324,83 @@
 
     function resetPassingGame() {
       players = [];
-      let numPlayers = level === 1 ? random(3, 6) : level === 4 ? random(4, 7) : random(5, 8);
-      let numOpponents = level === 1 ? random(1, 3) : level === 4 ? random(2, 4) : random(3, 5);
-      let numDistractors = level === 5 ? random(1, 3) : level === 4 ? 1 : 0;
-      let spacing = level === 5 ? 40 : 60;
-      for (let i = 0; i < numPlayers; i++) {
-        let isOpponent = i < numOpponents;
-        let isAmber = level >= 4 && i === numOpponents;
-        let outlineColor = null;
-        if (level === 5 && i >= numOpponents && i < numOpponents + numDistractors) {
-          outlineColor = i % 2 === 0 ? [255, 165, 0] : [255, 0, 0]; // Orange or red
-        }
-        let x, y;
+      if (level === 1) {
+        // Place two red opponents
+        let red1 = { x: random(100, width - 100), y: random(100, height - 100), isOpponent: true };
+        let red2;
         do {
-          x = random(50, width - 50);
-          y = random(50, height - 100);
-        } while (players.some(p => dist(x, y, p.x, p.y) < spacing));
-        players.push({ x, y, isOpponent, isAmber, outlineColor });
-      }
-      let teammates = players.filter(p => !p.isOpponent && !p.isAmber && !p.outlineColor);
-      correctPlayer = teammates.reduce((best, curr) => {
-        let minDistToOpponent = min(players.filter(p => p.isOpponent).map(p => dist(curr.x, curr.y, p.x, p.y)));
-        let bestDist = best ? min(players.filter(p => p.isOpponent).map(p => dist(best.x, best.y, p.x, p.y))) : 0;
-        return minDistToOpponent > bestDist ? curr : best;
-      }, null);
-      if (correctPlayer && level === 5) {
-        correctPlayer.outlineColor = [255, 255, 0]; // Yellow for correct player
+          red2 = { x: random(100, width - 100), y: random(100, height - 100), isOpponent: true };
+        } while (dist(red1.x, red1.y, red2.x, red2.y) < 60);
+        players.push(red1, red2);
+        // Place two white teammates near red opponents
+        let white1 = {
+          x: red1.x + random(-80, 80),
+          y: red1.y + random(-80, 80),
+          isOpponent: false,
+          isAmber: false,
+          outlineColor: null
+        };
+        let white2 = {
+          x: red2.x + random(-80, 80),
+          y: red2.y + random(-80, 80),
+          isOpponent: false,
+          isAmber: false,
+          outlineColor: null
+        };
+        // Ensure within 100px of red balls
+        while (dist(white1.x, white1.y, red1.x, red1.y) > 100) {
+          white1.x = red1.x + random(-80, 80);
+          white1.y = red1.y + random(-80, 80);
+        }
+        while (dist(white2.x, white2.y, red2.x, red2.y) > 100) {
+          white2.x = red2.x + random(-80, 80);
+          white2.y = red2.y + random(-80, 80);
+        }
+        // Place free white teammate far from both red balls
+        let white3;
+        do {
+          white3 = {
+            x: random(50, width - 50),
+            y: random(50, height - 100),
+            isOpponent: false,
+            isAmber: false,
+            outlineColor: null
+          };
+        } while (
+          dist(white3.x, white3.y, red1.x, red1.y) < 150 ||
+          dist(white3.x, white3.y, red2.x, red2.y) < 150 ||
+          players.some(p => dist(white3.x, white3.y, p.x, p.y) < 60)
+        );
+        players.push(white1, white2, white3);
+        correctPlayer = white3;
+      } else {
+        let numPlayers = level === 4 ? random(4, 7) : random(5, 8);
+        let numOpponents = level === 4 ? random(2, 4) : random(3, 5);
+        let numDistractors = level === 5 ? random(1, 3) : level === 4 ? 1 : 0;
+        let spacing = level === 5 ? 40 : 60;
+        for (let i = 0; i < numPlayers; i++) {
+          let isOpponent = i < numOpponents;
+          let isAmber = level >= 4 && i === numOpponents;
+          let outlineColor = null;
+          if (level === 5 && i >= numOpponents && i < numOpponents + numDistractors) {
+            outlineColor = i % 2 === 0 ? [255, 165, 0] : [255, 0, 0]; // Orange or red
+          }
+          let x, y;
+          do {
+            x = random(50, width - 50);
+            y = random(50, height - 100);
+          } while (players.some(p => dist(x, y, p.x, p.y) < spacing));
+          players.push({ x, y, isOpponent, isAmber, outlineColor });
+        }
+        let teammates = players.filter(p => !p.isOpponent && !p.isAmber && !p.outlineColor);
+        correctPlayer = teammates.reduce((best, curr) => {
+          let minDistToOpponent = min(players.filter(p => p.isOpponent).map(p => dist(curr.x, curr.y, p.x, p.y)));
+          let bestDist = best ? min(players.filter(p => p.isOpponent).map(p => dist(best.x, best.y, p.x, p.y))) : 0;
+          return minDistToOpponent > bestDist ? curr : best;
+        }, null);
+        if (correctPlayer && level === 5) {
+          correctPlayer.outlineColor = [255, 255, 0]; // Yellow for correct player
+        }
       }
       select('#color-buttons').hide();
     }
@@ -356,6 +410,7 @@
       ball.y = height / 2;
       ball.vx = random(-3, 3);
       ball.vy = random(-3, 3);
+      ball.lastUpdate = millis();
       select('#color-buttons').hide();
       gameState = 'playing';
       startTime = millis();
@@ -432,7 +487,7 @@
 
     function updateInstructions() {
       if (level === 1) {
-        select('#instructions').html('Tap the teammate (white) in the best position to pass to.');
+        select('#instructions').html('Tap the teammate not near any red opponents.');
       } else if (level === 2) {
         select('#instructions').html('Track the white ball moving slowly across the screen.');
       } else if (level === 3) {
