@@ -99,7 +99,7 @@
       <ul>
         <li><strong>Level 1 (Passing):</strong> Tap the white teammate not near any red opponents. Three white teammates, two red opponents; two white teammates are near red ones. Time: 3s. Score 10 points to advance.</li>
         <li><strong>Level 2 (Ball Tracking):</strong> Track a white ball moving slowly across the screen for 10 seconds to train visual tracking. No tapping required. Advances automatically.</li>
-        <li><strong>Level 3 (Stroop Test):</strong> A word (e.g., "Blue" in white) appears. Tap the button matching the text color, not the word. Complete 10 correct answers to advance.</li>
+        <li><strong>Level 3 (Stroop Test):</strong> A word (e.g., "Blue" in white) appears. Tap the button matching the text color, not the word. Tap any button to continue after correct/wrong. Complete 10 correct answers to advance.</li>
         <li><strong>Level 4 (Advanced Passing):</strong> Like Level 1, but with more opponents, 2s timer, and an amber teammate (avoid). Score 10 points to advance.</li>
         <li><strong>Level 5 (Elite Passing):</strong> Toughest level with 3-5 opponents, 1.5s timer, smaller targets, and white circles with orange/red outlines (avoid). Tap only the white circle with yellow outline. Score 10 points to loop to Level 1.</li>
       </ul>
@@ -131,7 +131,7 @@
     let stroopIndex = 0;
     let correctColor = '';
     let levelProgress = 0;
-    let usedWords = [];
+    let availableWords = [];
     let canvas;
 
     function setup() {
@@ -251,7 +251,8 @@
         if (timeLeft <= 0) {
           level = 3;
           levelProgress = 0;
-          usedWords = [];
+          availableWords = [...stroopWords];
+          shuffle(availableWords);
           resetLevel();
           updateInstructions();
         }
@@ -260,10 +261,10 @@
 
     function drawStroopTest() {
       select('#time').html('');
-      if (stroopIndex >= stroopWords.length || !stroopWords[stroopIndex] || gameState === 'start') {
+      if (!availableWords[stroopIndex] || gameState === 'start') {
         resetStroopTest(); // Prevent blank screen
       }
-      let current = stroopWords[stroopIndex];
+      let current = availableWords[stroopIndex];
       fill(current.color);
       text(current.word.toUpperCase(), width / 2, height / 2);
       if (gameState === 'correct') {
@@ -406,14 +407,12 @@
     }
 
     function resetStroopTest() {
-      let availableWords = stroopWords.filter(word => !usedWords.includes(word));
       if (availableWords.length === 0) {
-        usedWords = [];
-        availableWords = stroopWords;
+        availableWords = [...stroopWords];
+        shuffle(availableWords);
       }
-      stroopIndex = floor(random(availableWords.length));
+      stroopIndex = 0;
       let selectedWord = availableWords[stroopIndex];
-      usedWords.push(selectedWord);
       correctColor = selectedWord.color;
       let buttons = ['red', 'blue', 'white', 'green', 'yellow'];
       shuffle(buttons);
@@ -432,17 +431,23 @@
                 score++;
                 levelProgress++;
                 gameState = 'correct';
-                select('#instructions').html(`Correct! ${10 - levelProgress} left. Tap a button to continue.`);
-                checkLevelProgress();
+                select('#instructions').html(`Correct! ${10 - levelProgress} left. Tap any button to continue.`);
+                if (levelProgress < 10) {
+                  stroopIndex++;
+                  availableWords.splice(0, 1); // Remove used word
+                  resetStroopTest();
+                }
               } else {
                 gameState = 'wrong';
-                select('#instructions').html(`Wrong! ${10 - levelProgress} left. Tap a button to try again.`);
+                select('#instructions').html(`Wrong! ${10 - levelProgress} left. Tap any button to try again.`);
               }
             } else {
-              resetStroopTest();
+              stroopIndex++;
+              availableWords.splice(0, 1); // Remove used word
               gameState = 'playing';
-              updateInstructions();
+              resetStroopTest();
             }
+            checkLevelProgress();
           }
         });
         button.mousePressed(() => {
@@ -452,17 +457,23 @@
                 score++;
                 levelProgress++;
                 gameState = 'correct';
-                select('#instructions').html(`Correct! ${10 - levelProgress} left. Tap a button to continue.`);
-                checkLevelProgress();
+                select('#instructions').html(`Correct! ${10 - levelProgress} left. Tap any button to continue.`);
+                if (levelProgress < 10) {
+                  stroopIndex++;
+                  availableWords.splice(0, 1); // Remove used word
+                  resetStroopTest();
+                }
               } else {
                 gameState = 'wrong';
-                select('#instructions').html(`Wrong! ${10 - levelProgress} left. Tap a button to try again.`);
+                select('#instructions').html(`Wrong! ${10 - levelProgress} left. Tap any button to try again.`);
               }
             } else {
-              resetStroopTest();
+              stroopIndex++;
+              availableWords.splice(0, 1); // Remove used word
               gameState = 'playing';
-              updateInstructions();
+              resetStroopTest();
             }
+            checkLevelProgress();
           }
         });
         buttonDiv.child(button);
@@ -474,13 +485,13 @@
       if ((level === 1 || level === 4 || level === 5) && levelProgress >= 10) {
         level = level === 5 ? 1 : level + 1;
         levelProgress = 0;
-        usedWords = [];
+        availableWords = [];
         resetLevel();
         updateInstructions();
       } else if (level === 3 && levelProgress >= 10) {
         level = 4;
         levelProgress = 0;
-        usedWords = [];
+        availableWords = [];
         resetLevel();
         updateInstructions();
       }
